@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Norwest Agency — License Tracker</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- ── HEADER ── -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <div>
+          <h1>License Tracker</h1>
+          <span class="header-sub">Norwest Agency</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost" id="refreshBtn" onclick="loadData()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          Refresh
+        </button>
+        <button class="btn btn-primary" onclick="openAddModal()">
+          + Add License
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── ALERT BANNER ── -->
+  <div id="alertBanner" class="alert-banner hidden"></div>
+
+  <!-- ── MAIN ── -->
+  <main class="main-content">
+
+    <!-- Summary Cards -->
+    <section class="summary-cards" id="summaryCards">
+      <div class="card stat-card">
+        <div class="stat-label">Total Licenses</div>
+        <div class="stat-value" id="statTotal">—</div>
+      </div>
+      <div class="card stat-card urgent">
+        <div class="stat-label">Expiring &lt; 30 Days</div>
+        <div class="stat-value" id="statUrgent">—</div>
+      </div>
+      <div class="card stat-card warning">
+        <div class="stat-label">Expiring 30–90 Days</div>
+        <div class="stat-value" id="statWarning">—</div>
+      </div>
+      <div class="card stat-card good">
+        <div class="stat-label">Current</div>
+        <div class="stat-value" id="statCurrent">—</div>
+      </div>
+    </section>
+
+    <!-- Filters -->
+    <section class="filters-bar">
+      <div class="filter-group">
+        <label>View</label>
+        <div class="tab-group" id="viewTabs">
+          <button class="tab active" data-view="all" onclick="setView('all')">All</button>
+          <button class="tab" data-view="agency" onclick="setView('agency')">Agency</button>
+          <button class="tab" data-view="producers" onclick="setView('producers')">Producers</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label for="producerFilter">Producer</label>
+        <select id="producerFilter" onchange="applyFilters()">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="stateFilter">State</label>
+        <select id="stateFilter" onchange="applyFilters()">
+          <option value="">All States</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="statusFilter">Status</label>
+        <select id="statusFilter" onchange="applyFilters()">
+          <option value="">All Statuses</option>
+          <option value="urgent">Urgent (&lt;30 days)</option>
+          <option value="warning">Warning (30–90 days)</option>
+          <option value="current">Current</option>
+          <option value="expired">Expired</option>
+          <option value="pending">Pending Renewal</option>
+        </select>
+      </div>
+      <div class="filter-group search-group">
+        <label for="searchInput">Search</label>
+        <input type="text" id="searchInput" placeholder="Name, state, license #..." oninput="applyFilters()" />
+      </div>
+    </section>
+
+    <!-- License Table -->
+    <section class="table-section card">
+      <div class="table-header">
+        <h2 id="tableTitle">All Licenses</h2>
+        <div class="table-meta" id="tableMeta"></div>
+      </div>
+      <div class="table-wrapper">
+        <table id="licenseTable">
+          <thead>
+            <tr>
+              <th>Name / Entity</th>
+              <th>Type</th>
+              <th>State</th>
+              <th>License #</th>
+              <th>Lines of Authority</th>
+              <th>Expiration</th>
+              <th>Status</th>
+              <th>Renewal Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="licenseTableBody">
+            <tr class="loading-row">
+              <td colspan="9">
+                <div class="loading-spinner"></div>
+                <span>Loading license data…</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── ADD / EDIT MODAL ── -->
+  <div id="modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="modalTitle">Add License</h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <form id="licenseForm" onsubmit="handleFormSubmit(event)">
+
+        <!-- Row type -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Record Type *</label>
+            <select name="recordType" id="recordType" required onchange="toggleProducerFields()">
+              <option value="Producer">Producer</option>
+              <option value="Agency">Agency</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Producer-only fields -->
+        <div id="producerFields">
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label>First Name *</label>
+              <input type="text" name="firstName" placeholder="Jane" />
+            </div>
+            <div class="form-group">
+              <label>Last Name *</label>
+              <input type="text" name="lastName" placeholder="Smith" />
+            </div>
+          </div>
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label>NPN</label>
+              <input type="text" name="npn" placeholder="1234567890" maxlength="10" />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" name="email" placeholder="jane@norwestagency.com" />
+            </div>
+          </div>
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label>Resident State</label>
+              <select name="residentState">
+                <option value="">— Select —</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>CE Credits Required</label>
+              <input type="number" name="ceRequired" min="0" placeholder="24" />
+            </div>
+          </div>
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label>CE Credits Completed</label>
+              <input type="number" name="ceCompleted" min="0" placeholder="0" />
+            </div>
+            <div class="form-group">
+              <label>CE Completion Deadline</label>
+              <input type="date" name="ceDeadline" />
+            </div>
+          </div>
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label>Last NIPR Login</label>
+              <input type="date" name="lastNiprLogin" />
+            </div>
+            <div class="form-group">
+              <label>Renewal Status</label>
+              <select name="renewalStatus">
+                <option value="Current">Current</option>
+                <option value="Pending CE">Pending CE</option>
+                <option value="Renewal Submitted">Renewal Submitted</option>
+                <option value="Expired">Expired</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agency-only fields -->
+        <div id="agencyFields" class="hidden">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Agency / Entity Name *</label>
+              <input type="text" name="agencyName" placeholder="Norwest Agency LLC" />
+            </div>
+          </div>
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label>NPN</label>
+              <input type="text" name="agencyNpn" placeholder="Agency NPN" maxlength="10" />
+            </div>
+            <div class="form-group">
+              <label>Contact Email</label>
+              <input type="email" name="agencyEmail" placeholder="admin@norwestagency.com" />
+            </div>
+          </div>
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label>Resident State</label>
+              <select name="residentState">
+                <option value="">— Select —</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Renewal Status</label>
+              <select name="renewalStatus">
+                <option value="Current">Current</option>
+                <option value="Renewal Submitted">Renewal Submitted</option>
+                <option value="Expired">Expired</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <hr class="form-divider" />
+        <h3 class="form-section-title">State License Details</h3>
+
+        <div class="form-row two-col">
+          <div class="form-group">
+            <label>State *</label>
+            <select name="licenseState" required>
+              <option value="">— Select State —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>License Number</label>
+            <input type="text" name="licenseNumber" placeholder="ABC123456" />
+          </div>
+        </div>
+        <div class="form-row two-col">
+          <div class="form-group">
+            <label>License Type *</label>
+            <select name="licenseType" required>
+              <option value="Resident">Resident</option>
+              <option value="Non-Resident">Non-Resident</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Lines of Authority</label>
+            <input type="text" name="linesOfAuthority" placeholder="P&amp;C, Life, Health" />
+          </div>
+        </div>
+        <div class="form-row two-col">
+          <div class="form-group">
+            <label>Expiration Date *</label>
+            <input type="date" name="expirationDate" required />
+          </div>
+          <div class="form-group">
+            <label>License Status</label>
+            <select name="licenseStatus">
+              <option value="Active">Active</option>
+              <option value="Pending Renewal">Pending Renewal</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Expired">Expired</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date Last Renewed</label>
+            <input type="date" name="dateLastRenewed" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea name="notes" rows="2" placeholder="Any state-specific notes…"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submitBtn">Save License</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── DETAIL MODAL ── -->
+  <div id="detailModal" class="modal-backdrop hidden" onclick="closeDetailOnBackdrop(event)">
+    <div class="modal-box wide">
+      <div class="modal-header">
+        <h2 id="detailTitle">License Details</h2>
+        <button class="modal-close" onclick="closeDetailModal()">✕</button>
+      </div>
+      <div id="detailContent"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeDetailModal()">Close</button>
+        <button class="btn btn-secondary" id="detailEditBtn">Edit This License</button>
+        <button class="btn btn-danger" id="detailDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONFIG MODAL ── -->
+  <div id="configModal" class="modal-backdrop hidden" onclick="closeConfigOnBackdrop(event)">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>⚙ Configuration</h2>
+        <button class="modal-close" onclick="closeConfigModal()">✕</button>
+      </div>
+      <div class="config-body">
+        <p class="config-intro">Enter the Web App URL from your deployed Google Apps Script to connect this dashboard to your Google Sheet.</p>
+        <div class="form-group">
+          <label>Google Apps Script Web App URL</label>
+          <input type="url" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/…/exec" />
+        </div>
+        <div class="form-group" style="margin-top:14px;">
+          <label>Write Secret Key</label>
+          <input type="password" id="writeSecretInput" placeholder="Your secret key for add / edit / delete" />
+        </div>
+        <div class="config-hint">
+          <strong>How to get the Web App URL:</strong><br>
+          1. Open Google Apps Script → Deploy → New Deployment<br>
+          2. Type: Web App → Execute as: Me → Access: Anyone<br>
+          3. Copy the Web App URL and paste it above<br><br>
+          <strong>Write Secret Key:</strong><br>
+          Must match the <code>WRITE_SECRET</code> value set in your <code>Code.gs</code>.
+          Reading data is always open; this key is only required to add, edit, or delete records.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeConfigModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveConfig()">Save & Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONFIG BUTTON (bottom-right) ── -->
+  <button class="fab-config" onclick="openConfigModal()" title="Configure backend connection">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+    </svg>
+  </button>
+
+  <script src="js/states.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
